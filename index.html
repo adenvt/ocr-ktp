@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vite + TS</title>
+  <link rel="stylesheet" href="/dev/main.css">
+</head>
+
+<body>
+  <div id="app" class="flex flex-col items-center justify-start min-h-screen gap-4 overflow-hidden max-w-screen">
+    <div class="flex items-center gap-4 p-4">
+      <label class="relative" for="fileinput">
+        <input class="absolute w-0 h-0 p-2 border rounded opacity-0" type="file" name="image" id="fileinput"
+          placeholder="Select image" accept="image/*">
+        <span class="p-2 text-white bg-blue-700 border border-blue-800 rounded cursor-pointer hover:bg-blue-800">Open
+          File</span>
+      </label>
+      <p>
+        Duration: <span id="duration">-</span>
+      </p>
+    </div>
+
+    <div class="grid items-start w-full grid-cols-4 gap-3 p-4" id="preview">
+      <div class="flex flex-col space-y-2">
+        <p>Original</p>
+        <canvas class="w-full h-auto bg-black border" id="input" width="640" height="640"></canvas>
+      </div>
+      <div class="flex flex-col space-y-2">
+        <p>Cropped</p>
+        <canvas class="w-full h-auto bg-black border" id="crop" width="640" height="403.58"></canvas>
+      </div>
+      <div class="flex flex-col space-y-2">
+        <p>Rectify</p>
+        <canvas class="w-full h-auto bg-black border" id="output" width="640" height="403.58"></canvas>
+        <p>Filter</p>
+        <canvas class="w-full h-auto bg-black border" id="filter" width="640" height="403.58"></canvas>
+        <p>Grayscale</p>
+        <canvas class="w-full h-auto bg-black border" id="grayed" width="640" height="403.58"></canvas>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <script type="module" src="/dev/main.ts"></script>
+</body>
+
+</html>
