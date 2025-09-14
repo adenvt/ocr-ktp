@@ -28,9 +28,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   note.textContent = 'Initiating ONNX Runtime ...'
 
-  const ort = await import('onnxruntime-web')
+  const ort = await import('onnxruntime-web/wasm')
 
-  note.textContent = 'Initiating YOLO Model ...'
+  note.textContent        = 'Initiating YOLO Model ...'
+  ort.env.wasm.numThreads = 1
 
   const model = await ort.default.InferenceSession.create(MODEL)
   const yolo  = useYolo({
