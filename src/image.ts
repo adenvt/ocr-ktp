@@ -1,6 +1,7 @@
 import CV from '@techstark/opencv-js'
 
 let cv: typeof CV
+
 export async function useCV (): Promise<typeof cv> {
   if (!cv)
     cv = CV instanceof Promise ? await CV : CV
@@ -105,4 +106,18 @@ export async function autoContrast (src: CV.Mat, dst: CV.Mat, clipHistPercent = 
   gray.delete()
   hist.delete()
   mask.delete()
+}
+
+export function drawOverlay (img: CV.Mat, mask: CV.Mat, color: CV.Scalar, transparency = 0.5) {
+  for (let i = 0; i < img.rows; i++) {
+    for (let j = 0; j < img.cols; j++) {
+      const a     = mask.ucharPtr(i, j)[0]
+      const beta  = transparency * a / 255
+      const alpha = 1 - beta
+      const ptr   = img.ucharPtr(i, j)
+
+      for (let k = 0; k < img.channels(); k++)
+        ptr[k] = ptr[k] * alpha + color[k] * beta
+    }
+  }
 }

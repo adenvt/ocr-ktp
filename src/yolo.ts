@@ -1,4 +1,4 @@
-import * as ort from 'onnxruntime-web'
+import type * as ort from 'onnxruntime-web'
 import type CV from '@techstark/opencv-js'
 import { clamp, sigmoid } from './utils'
 import { defu } from 'defu'
@@ -8,6 +8,18 @@ import {
   useCV,
 } from './image'
 
+interface YoloOption {
+  ort: typeof ort,
+  /**
+   * Model path
+   */
+  modelPath: string,
+  /**
+   * Labels
+   */
+  labels: string[],
+}
+
 interface YoloResult {
   /**
    * Label
@@ -16,7 +28,7 @@ interface YoloResult {
   /**
    * Class index
    */
-  classIdx: number,
+  classId: number,
   /**
    * Confidence
    */
@@ -26,6 +38,9 @@ interface YoloResult {
    * Format: [x1, y1, x2, y2]
    */
   bbox: [number, number, number, number],
+  /**
+   * Segmentation mask
+   */
   mask: Uint8ClampedArray,
 }
 
@@ -36,7 +51,7 @@ interface YoloPredictOption {
   confidence: number,
 }
 
-export function useYolo (modelPath: string, labels: string[]) {
+export function useYolo ({ ort, modelPath, labels }: YoloOption) {
   let cv: typeof CV
   let model: ort.InferenceSession
 
@@ -108,11 +123,11 @@ export function useYolo (modelPath: string, labels: string[]) {
     const results: YoloResult[] = []
 
     for (let i = 0; i < maxDetections; i++) {
-      const offset   = i * stride
-      const score    = boxData[offset + 4]
-      const classIdx = boxData[offset + 5]
+      const offset  = i * stride
+      const score   = boxData[offset + 4]
+      const classId = boxData[offset + 5]
 
-      if (score < config.confidence || classIdx < 0 || classIdx >= labels.length)
+      if (score < config.confidence || classId < 0 || classId >= labels.length)
         continue
 
       const x1 = clamp(Math.floor(boxData[offset]), 0, inputSize.width)
@@ -131,7 +146,7 @@ export function useYolo (modelPath: string, labels: string[]) {
       })
 
       const rect    = new cv.Rect(x1, y1, x2 - x1, y2 - y1)
-      const maskRaw = cv.matFromArray(maskSize.height, maskSize.width, cv.CV_8UC1, Array.from(maskData32F, (c) => c * 255))
+      const maskRaw = cv.matFromArray(maskSize.height, maskSize.width, cv.CV_8UC1, Uint8ClampedArray.from(maskData32F, (c) => c * 255))
 
       cv.resize(maskRaw, maskRaw, inputSize, 0, 0, cv.INTER_CUBIC)
 
@@ -149,8 +164,8 @@ export function useYolo (modelPath: string, labels: string[]) {
       cv.resize(maskObject, maskObject, new cv.Size(wo, ho), 0, 0, cv.INTER_CUBIC)
 
       results.push({
-        classIdx  : classIdx,
-        label     : labels[classIdx],
+        classId   : classId,
+        label     : labels[classId],
         confidence: score,
         bbox      : [
           x1o,
