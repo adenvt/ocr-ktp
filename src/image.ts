@@ -1,10 +1,15 @@
-import CV from '@techstark/opencv-js'
+import type CV from '@techstark/opencv-js'
 
 let cv: typeof CV
 
 export async function useCV (): Promise<typeof cv> {
-  if (!cv)
-    cv = CV instanceof Promise ? await CV : CV
+  if (!cv) {
+    const { default: CV } = await import('@techstark/opencv-js')
+
+    cv = CV instanceof Promise
+      ? await CV
+      : CV
+  }
 
   return cv
 }

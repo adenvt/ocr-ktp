@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import * as ort from 'onnxruntime-web'
 import MODEL from '../model/yolov11n.onnx?url'
 import { useYolo } from '../src/yolo'
 import { rectify } from '../src/rectify'
@@ -16,8 +15,9 @@ function toSeconds (ms: number) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const cv   = await useCV()
+  const ort  = await import('onnxruntime-web')
   const yolo = useYolo({
-    ort      : ort,
+    ort      : ort.default,
     modelPath: MODEL,
     labels   : [
       'kartu',
