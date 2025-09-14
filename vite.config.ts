@@ -4,6 +4,6 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 export default defineConfig({
   plugins      : [tailwindcss(), nodePolyfills()],
-  assetsInclude: ['**/*.onnx'],
+  assetsInclude: ['**/*.onnx', '**/*.ort'],
   optimizeDeps : { exclude: ['onnxruntime-web'] },
 })

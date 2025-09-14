@@ -1,4 +1,5 @@
-import type * as ort from 'onnxruntime-web'
+import type { InferenceSession } from 'onnxruntime-common'
+import { Tensor } from 'onnxruntime-common'
 import type CV from '@techstark/opencv-js'
 import { clamp, sigmoid } from './utils'
 import { defu } from 'defu'
@@ -9,11 +10,7 @@ import {
 } from './image'
 
 interface YoloOption {
-  ort: typeof ort,
-  /**
-   * Model path
-   */
-  modelPath: string,
+  model: InferenceSession,
   /**
    * Labels
    */
@@ -51,24 +48,14 @@ interface YoloPredictOption {
   confidence: number,
 }
 
-export function useYolo ({ ort, modelPath, labels }: YoloOption) {
-  let cv: typeof CV
-  let model: ort.InferenceSession
-
-  async function init () {
-    cv    = await useCV()
-    model = await ort.InferenceSession.create(modelPath)
-  }
-
+export function useYolo ({ model, labels }: YoloOption) {
   async function predict (input: string | File | CV.Mat, options?: Partial<YoloPredictOption>) {
     const config = defu<YoloPredictOption, [YoloPredictOption]>(options, { confidence: 0.8 })
+    const cv     = await useCV()
 
-    if (!model || !cv)
-      await init()
-
-    const inputMeta = model.inputMetadata[0] as ort.InferenceSession.TensorValueMetadata
-    const boxMeta   = model.outputMetadata[0] as ort.InferenceSession.TensorValueMetadata
-    const maskMeta  = model.outputMetadata[1] as ort.InferenceSession.TensorValueMetadata
+    const inputMeta = model.inputMetadata[0] as InferenceSession.TensorValueMetadata
+    const boxMeta   = model.outputMetadata[0] as InferenceSession.TensorValueMetadata
+    const maskMeta  = model.outputMetadata[1] as InferenceSession.TensorValueMetadata
 
     // Preprocess
     const orig      = await openImage(input)
@@ -103,7 +90,7 @@ export function useYolo ({ ort, modelPath, labels }: YoloOption) {
     )
 
     // Inference
-    const tensor = new ort.Tensor('float32', blob.data32F, inputMeta.shape as number[])
+    const tensor = new Tensor('float32', blob.data32F, inputMeta.shape as number[])
     const result = await model.run({ [inputMeta.name]: tensor })
 
     const boxResult  = result[boxMeta.name] // [1, 300, 38]

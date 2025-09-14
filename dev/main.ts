@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import MODEL from '../model/yolov11n.onnx?url'
+import MODEL from '../model/yolov11n.ort?url'
 import { useYolo } from '../src/yolo'
 import { rectify } from '../src/rectify'
 import {
@@ -14,24 +14,6 @@ function toSeconds (ms: number) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const cv   = await useCV()
-  const ort  = await import('onnxruntime-web')
-  const yolo = useYolo({
-    ort      : ort.default,
-    modelPath: MODEL,
-    labels   : [
-      'kartu',
-      'ktp',
-      'ktp-fc',
-    ],
-  })
-
-  const colors = [
-    new cv.Scalar(0, 255, 0, 255),
-    new cv.Scalar(0, 0, 255, 255),
-    new cv.Scalar(255, 0, 0, 255),
-  ]
-
   const note      = document.querySelector('#note') as HTMLInputElement
   const fileinput = document.querySelector('#fileinput') as HTMLInputElement
   const input     = document.querySelector('#input') as HTMLCanvasElement
@@ -39,6 +21,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   const output    = document.querySelector('#output') as HTMLCanvasElement
   const filter    = document.querySelector('#filter') as HTMLCanvasElement
   const grayed    = document.querySelector('#grayed') as HTMLCanvasElement
+
+  const cv    = await useCV()
+  const ort   = await import('onnxruntime-web')
+  const model = await ort.default.InferenceSession.create(MODEL)
+  const yolo  = useYolo({
+    model : model,
+    labels: [
+      'kartu',
+      'ktp',
+      'ktp-fc',
+    ],
+  })
+
+  note.textContent   = 'Ready!'
+  fileinput.disabled = false
+
+  const colors = [
+    new cv.Scalar(0, 255, 0, 255),
+    new cv.Scalar(0, 0, 255, 255),
+    new cv.Scalar(255, 0, 0, 255),
+  ]
 
   let startTime  = 0
   let detectTime = 0
