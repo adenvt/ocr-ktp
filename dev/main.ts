@@ -22,8 +22,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const filter    = document.querySelector('#filter') as HTMLCanvasElement
   const grayed    = document.querySelector('#grayed') as HTMLCanvasElement
 
-  const cv    = await useCV()
-  const ort   = await import('onnxruntime-web')
+  note.textContent = 'Initiating OpenCV ...'
+
+  const cv = await useCV()
+
+  note.textContent = 'Initiating ONNX Runtime ...'
+
+  const ort = await import('onnxruntime-web')
+
+  note.textContent = 'Initiating YOLO Model ...'
+
   const model = await ort.default.InferenceSession.create(MODEL)
   const yolo  = useYolo({
     model : model,
