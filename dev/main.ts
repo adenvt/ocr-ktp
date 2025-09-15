@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import MODEL from '../model/yolov11n.ort?url'
+import OBJECT_DETECT_MODEL from '../model/object-detect.onnx?url'
+import TEXT_DETECT_MODEL from '../model/text-detect.onnx?url'
+
 import { useYolo } from '../src/yolo'
 import { rectify } from '../src/rectify'
 import {
@@ -8,34 +10,37 @@ import {
   openImage,
   useCV,
 } from '../src/image'
+import { useDBNet } from '../src/dbnet'
 
 function toSeconds (ms: number) {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const note      = document.querySelector('#note') as HTMLInputElement
+function log (message: string) {
+  (document.querySelector('#note') as HTMLParagraphElement).textContent = message
+}
+
+async function main () {
   const fileinput = document.querySelector('#fileinput') as HTMLInputElement
   const input     = document.querySelector('#input') as HTMLCanvasElement
   const crop      = document.querySelector('#crop') as HTMLCanvasElement
   const output    = document.querySelector('#output') as HTMLCanvasElement
   const filter    = document.querySelector('#filter') as HTMLCanvasElement
   const grayed    = document.querySelector('#grayed') as HTMLCanvasElement
+  const textArea  = document.querySelector('#text-mask') as HTMLCanvasElement
 
-  note.textContent = 'Initiating OpenCV ...'
+  log('Initiating OpenCV ...')
 
   const cv = await useCV()
 
-  note.textContent = 'Initiating ONNX Runtime ...'
+  log('Initiating ONNX Runtime ...')
 
-  const ort = await import('onnxruntime-web/wasm')
+  const ort = await import('onnxruntime-web')
 
-  note.textContent        = 'Initiating YOLO Model ...'
-  ort.env.wasm.numThreads = 1
+  log('Initiating YOLO Model ...')
 
-  const model = await ort.default.InferenceSession.create(MODEL)
-  const yolo  = useYolo({
-    model : model,
+  const yolo = useYolo({
+    model : await ort.default.InferenceSession.create(OBJECT_DETECT_MODEL),
     labels: [
       'kartu',
       'ktp',
@@ -43,8 +48,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     ],
   })
 
-  note.textContent   = 'Ready!'
   fileinput.disabled = false
+
+  const dbnet = useDBNet({ model: await ort.InferenceSession.create(TEXT_DETECT_MODEL) })
+
+  log('Ready!')
 
   const colors = [
     new cv.Scalar(0, 255, 0, 255),
@@ -105,7 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       cv.imshow(crop, temp)
 
-      await rectify(src, dst, rect, mask)
+      await rectify(src, dst, rect, mask, new cv.Size(1024, 646))
 
       const contrast = new cv.Mat()
       const gray     = new cv.Mat()
@@ -115,24 +123,48 @@ document.addEventListener('DOMContentLoaded', async () => {
       drawOverlay(roi, mask, colors[result.classId], 0.4)
 
       cv.cvtColor(contrast, gray, cv.COLOR_RGBA2GRAY)
+      cv.cvtColor(gray, gray, cv.COLOR_GRAY2RGBA)
       cv.rectangle(src, new cv.Point(rect.x, rect.y), new cv.Point(rect.x + rect.width, rect.y + rect.height), colors[result.classId], 2)
       cv.putText(src, result.label, new cv.Point(rect.x + 10, rect.y + 20), cv.FONT_HERSHEY_SIMPLEX, 0.7, new cv.Scalar(255, 255, 255, 255), 1, cv.LINE_AA, false)
+
+      const boxes = await dbnet.predict(gray)
+      const text  = new cv.Mat(gray.rows, gray.cols, dst.type(), new cv.Scalar(255, 255, 255, 255))
+
+      for (const box of boxes) {
+        const rect = new cv.Rect(
+          box[0],
+          box[1],
+          box[2] - box[0],
+          box[3] - box[1],
+        )
+
+        const srcRoi = gray.roi(rect)
+        const dstRoi = text.roi(rect)
+
+        srcRoi.copyTo(dstRoi)
+
+        srcRoi.delete()
+        dstRoi.delete()
+      }
 
       cv.imshow(input, src)
       cv.imshow(output, dst)
       cv.imshow(filter, contrast)
       cv.imshow(grayed, gray)
+      cv.imshow(textArea, text)
 
       roi.delete()
       chn.delete()
       mask.delete()
       temp.delete()
 
+      const totalTime = performance.now() - startTime
+
+      log(`Success, Time: ${toSeconds(totalTime)} (Detect: ${toSeconds(detectTime)})`)
+
       contrast.delete()
       gray.delete()
       dst.delete()
-
-      note.textContent = `Success, Time: ${toSeconds(performance.now() - startTime)} (Detect: ${toSeconds(detectTime)})`
     } else {
       const blank = cv.Mat.zeros(404, 640, cv.CV_8UC4)
 
@@ -143,9 +175,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       blank.delete()
 
-      note.textContent = 'Failed, Cannot find KTP in this image'
+      log('Failed, Cannot find KTP in this image')
     }
 
     src.delete()
   })
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  main()
+    .catch((error) => {
+      const message: string = error instanceof Error ? error.message : error
+
+      log(`Error, ${message}`)
+    })
 })

@@ -34,32 +34,6 @@ export async function openImage (input: string | Blob | CV.Mat) {
   return cv.imread(image)
 }
 
-export function getFitSize (width: number, height: number, maxWidth: number, maxHeight: number) {
-  const ratio = Math.min(maxWidth / width, maxHeight / height)
-
-  const w = Math.floor(width * ratio)
-  const h = Math.floor(height * ratio)
-
-  const dw = maxWidth - w
-  const dh = maxHeight - h
-
-  const left   = Math.floor(dw / 2)
-  const top    = Math.floor(dh / 2)
-  const right  = dw - left
-  const bottom = dh - top
-
-  return {
-    ratio  : ratio,
-    size   : [w, h],
-    padding: [
-      top,
-      right,
-      bottom,
-      left,
-    ], // Follow CSS padding
-  } as const
-}
-
 export async function autoContrast (src: CV.Mat, dst: CV.Mat, clipHistPercent = 10) {
   const cv = await useCV()
   // Convert to grayscale

@@ -245,7 +245,7 @@ async function getIoU (a: CV.Mat, b: CV.Mat) {
   return iou
 }
 
-export async function rectify (src: CV.Mat, dst: CV.Mat, area: CV.Rect, mask: CV.Mat) {
+export async function rectify (src: CV.Mat, dst: CV.Mat, area: CV.Rect, mask: CV.Mat, dstSize: CV.Size) {
   const cv        = await useCV()
   const contours  = new cv.MatVector()
   const hierarchy = new cv.Mat()
@@ -296,8 +296,8 @@ export async function rectify (src: CV.Mat, dst: CV.Mat, area: CV.Rect, mask: CV
 
     const corners    = await getCorners(hull)
     const isPortrait = area.height > area.width
-    const dstWidth   = isPortrait ? 404 : 640
-    const dstHeight  = isPortrait ? 640 : 404
+    const dstWidth   = isPortrait ? dstSize.height : dstSize.width
+    const dstHeight  = isPortrait ? dstSize.width : dstSize.height
 
     const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, corners.flatMap(({ x, y }) => [area.x + x, area.y + y]))
     const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [

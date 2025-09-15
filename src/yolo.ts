@@ -4,10 +4,10 @@ import type CV from '@techstark/opencv-js'
 import { clamp, sigmoid } from './utils'
 import { defu } from 'defu'
 import {
-  getFitSize,
   openImage,
   useCV,
 } from './image'
+import { useResizer } from './resizer'
 
 interface YoloOption {
   model: InferenceSession,
@@ -49,35 +49,25 @@ interface YoloPredictOption {
 }
 
 export function useYolo ({ model, labels }: YoloOption) {
+  const inputMeta = model.inputMetadata[0] as InferenceSession.TensorValueMetadata
+  const boxMeta   = model.outputMetadata[0] as InferenceSession.TensorValueMetadata
+  const maskMeta  = model.outputMetadata[1] as InferenceSession.TensorValueMetadata
+
   async function predict (input: string | File | CV.Mat, options?: Partial<YoloPredictOption>) {
     const config = defu<YoloPredictOption, [YoloPredictOption]>(options, { confidence: 0.8 })
-    const cv     = await useCV()
-
-    const inputMeta = model.inputMetadata[0] as InferenceSession.TensorValueMetadata
-    const boxMeta   = model.outputMetadata[0] as InferenceSession.TensorValueMetadata
-    const maskMeta  = model.outputMetadata[1] as InferenceSession.TensorValueMetadata
 
     // Preprocess
+    const cv        = await useCV()
     const orig      = await openImage(input)
     const size      = orig.size()
     const inputSize = new cv.Size(inputMeta.shape[2] as number, inputMeta.shape[3] as number)
-    const fit       = getFitSize(size.width, size.height, inputSize.width, inputSize.height)
-    const newsize   = new cv.Size(fit.size[0], fit.size[1])
-    const ratio     = fit.ratio
-
-    const [
-      top,
-      right,
-      bottom,
-      left,
-    ] = fit.padding
+    const resizer   = useResizer(size, inputSize)
 
     const src = new cv.Mat()
     const raw = new cv.Mat()
 
-    // Resize and pad
-    cv.resize(orig, src, newsize)
-    cv.copyMakeBorder(src, src, top, bottom, left, right, cv.BORDER_CONSTANT, new cv.Scalar(0, 0, 0, 255))
+    await resizer.scaleMat(orig, src)
+
     cv.cvtColor(src, raw, cv.COLOR_RGBA2BGR)
 
     const blob = cv.blobFromImage(
@@ -132,33 +122,27 @@ export function useYolo ({ model, labels }: YoloOption) {
         return sigmoid(sum)
       })
 
-      const rect    = new cv.Rect(x1, y1, x2 - x1, y2 - y1)
+      const masRect = new cv.Rect(x1, y1, x2 - x1, y2 - y1)
       const maskRaw = cv.matFromArray(maskSize.height, maskSize.width, cv.CV_8UC1, Uint8ClampedArray.from(maskData32F, (c) => c * 255))
 
+      // Because mask size only 160x160, we need to resize it equal to input size
       cv.resize(maskRaw, maskRaw, inputSize, 0, 0, cv.INTER_CUBIC)
 
-      const maskObject = maskRaw.roi(rect)
-
       // Upscale to original size
-      const x1o = clamp(Math.floor((x1 - left) / ratio), 0, size.width)
-      const y1o = clamp(Math.floor((y1 - top) / ratio), 0, size.height)
-      const x2o = clamp(Math.ceil((x2 - left) / ratio), 0, size.width)
-      const y2o = clamp(Math.ceil((y2 - top) / ratio), 0, size.height)
+      await resizer.revertMat(maskRaw, maskRaw)
 
-      const wo = x2o - x1o
-      const ho = y2o - y1o
-
-      cv.resize(maskObject, maskObject, new cv.Size(wo, ho), 0, 0, cv.INTER_CUBIC)
+      const rectObject = await resizer.revertRect(masRect)
+      const maskObject = maskRaw.roi(rectObject)
 
       results.push({
         classId   : classId,
         label     : labels[classId],
         confidence: score,
         bbox      : [
-          x1o,
-          y1o,
-          x2o,
-          y2o,
+          rectObject.x,
+          rectObject.y,
+          rectObject.x + rectObject.width,
+          rectObject.y + rectObject.height,
         ],
         mask: Uint8ClampedArray.from({ length: maskObject.rows * maskObject.cols }, (_, idx) => {
           const i = Math.floor(idx / maskObject.cols)

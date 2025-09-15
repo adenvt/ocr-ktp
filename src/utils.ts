@@ -17,3 +17,14 @@ export function angle (ct: { x: number, y: number }, pt: { x: number, y: number 
 export function clamp (value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
+
+export function argmax (arr: number[]) {
+  let maxIdx = 0
+
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] > arr[maxIdx])
+      maxIdx = i
+  }
+
+  return maxIdx
+}
