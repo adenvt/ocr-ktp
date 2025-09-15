@@ -6,13 +6,13 @@
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vite + TS</title>
-  <script type="module" crossorigin src="/assets/index-ePYgmzwq.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-d1Bgrz-7.css">
+  <script type="module" crossorigin src="/assets/index-wpi9uuJN.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-XodDViaQ.css">
 </head>
 
 <body>
   <div id="app" class="flex flex-col items-center justify-start min-h-screen gap-4 overflow-hidden max-w-screen">
-    <div class="flex flex-col md:flex-row items-center gap-4 p-4">
+    <div class="flex flex-col items-center gap-4 p-4 max-w-sm">
       <input type="file"
         class="file:mr-4 file:border-0 file:bg-violet-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-violet-700 hover:file:bg-violet-100 dark:file:bg-violet-600 dark:file:text-violet-100 dark:hover:file:bg-violet-500 disabled:opacity-50 border p-1"
         id="fileinput" disabled="disabled" />
@@ -35,6 +35,10 @@
         <canvas class="w-full h-auto bg-black border" id="filter" width="640" height="403.58"></canvas>
         <p>Grayscale</p>
         <canvas class="w-full h-auto bg-black border" id="grayed" width="640" height="403.58"></canvas>
+      </div>
+      <div class="flex flex-col space-y-2">
+        <p>Text</p>
+        <canvas class="w-full h-auto bg-black border" id="text-mask" width="640" height="403.58"></canvas>
       </div>
     </div>
   </div>
