@@ -2,31 +2,31 @@ import type CV from '@techstark/opencv-js'
 import { useCV } from './image'
 import { clamp } from './utils'
 
-enum HorizontalPad {
+enum HorizontalAlign {
   LEFT = 0x00,
   CENTER = 0x01,
   RIGHT = 0x02,
 }
 
-enum VerticalPad {
+enum VerticalAlign {
   TOP = 0x00,
   MID = 0x04,
   BOTTOM = 0x08,
 }
 
-export enum ResizePad {
-  TOP_LEFT = VerticalPad.TOP | HorizontalPad.LEFT,
-  TOP_CENTER = VerticalPad.TOP | HorizontalPad.CENTER,
-  TOP_RIGHT = VerticalPad.TOP | HorizontalPad.RIGHT,
-  MID_LEFT = VerticalPad.MID | HorizontalPad.LEFT,
-  MID_CENTER = VerticalPad.MID | HorizontalPad.CENTER,
-  MID_RIGHT = VerticalPad.MID | HorizontalPad.RIGHT,
-  BOTTOM_LEFT = VerticalPad.BOTTOM | HorizontalPad.LEFT,
-  BOTTOM_CENTER = VerticalPad.BOTTOM | HorizontalPad.CENTER,
-  BOTTOM_RIGHT = VerticalPad.BOTTOM | HorizontalPad.RIGHT,
+export enum ResizeAlign {
+  TOP_LEFT = VerticalAlign.TOP | HorizontalAlign.LEFT,
+  TOP_CENTER = VerticalAlign.TOP | HorizontalAlign.CENTER,
+  TOP_RIGHT = VerticalAlign.TOP | HorizontalAlign.RIGHT,
+  MID_LEFT = VerticalAlign.MID | HorizontalAlign.LEFT,
+  MID_CENTER = VerticalAlign.MID | HorizontalAlign.CENTER,
+  MID_RIGHT = VerticalAlign.MID | HorizontalAlign.RIGHT,
+  BOTTOM_LEFT = VerticalAlign.BOTTOM | HorizontalAlign.LEFT,
+  BOTTOM_CENTER = VerticalAlign.BOTTOM | HorizontalAlign.CENTER,
+  BOTTOM_RIGHT = VerticalAlign.BOTTOM | HorizontalAlign.RIGHT,
 }
 
-export function useResizer (srcSize: CV.Size, dstSize: CV.Size, pad: ResizePad = ResizePad.MID_CENTER) {
+export function useResizer (srcSize: CV.Size, dstSize: CV.Size, align: ResizeAlign = ResizeAlign.MID_CENTER) {
   const ratio = Math.min(dstSize.width / srcSize.width, dstSize.height / srcSize.height)
 
   const width  = Math.floor(srcSize.width * ratio)
@@ -38,14 +38,14 @@ export function useResizer (srcSize: CV.Size, dstSize: CV.Size, pad: ResizePad =
   let left = 0
   let top  = 0
 
-  if (pad & HorizontalPad.CENTER)
+  if (align & HorizontalAlign.CENTER)
     left = Math.floor(dw / 2)
-  else if (pad & HorizontalPad.RIGHT)
+  else if (align & HorizontalAlign.RIGHT)
     left = dw
 
-  if (pad & VerticalPad.MID)
+  if (align & VerticalAlign.MID)
     top = Math.floor(dh / 2)
-  else if (pad & VerticalPad.BOTTOM)
+  else if (align & VerticalAlign.BOTTOM)
     top = dh
 
   async function scaleMat (src: CV.Mat, dst: CV.Mat, padColor?: CV.Scalar, interpolation?: CV.int) {

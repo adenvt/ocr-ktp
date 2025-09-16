@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
+import { chunk } from 'es-toolkit'
 import OBJECT_DETECT_MODEL from '../model/object-detect.onnx?url'
 import TEXT_DETECT_MODEL from '../model/text-detect.onnx?url'
+import TEXT_RECOGNIZE_MODEL from '../model/text-recognition.onnx?url'
 
 import { useYolo } from '../src/yolo'
 import { rectify } from '../src/rectify'
@@ -11,9 +13,10 @@ import {
   useCV,
 } from '../src/image'
 import { useDBNet } from '../src/dbnet'
+import { useCRNN } from '../src/crnn'
 
-function toSeconds (ms: number) {
-  return `${(ms / 1000).toFixed(2)}s`
+function toSeconds (start: number, end: number) {
+  return `${((end - start) / 1000).toFixed(2)}s`
 }
 
 function log (message: string) {
@@ -50,7 +53,13 @@ async function main () {
 
   fileinput.disabled = false
 
+  log('Initiating DBNet Model ...')
+
   const dbnet = useDBNet({ model: await ort.InferenceSession.create(TEXT_DETECT_MODEL) })
+
+  log('Initiating CRNN Model ...')
+
+  const crnn = useCRNN({ model: await ort.InferenceSession.create(TEXT_RECOGNIZE_MODEL) })
 
   log('Ready!')
 
@@ -60,8 +69,14 @@ async function main () {
     new cv.Scalar(255, 0, 0, 255),
   ]
 
-  let startTime  = 0
-  let detectTime = 0
+  let runStart           = 0
+  let runEnd             = 0
+  let detectObjectStart  = 0
+  let detectObjectEnd    = 0
+  let detectTextStart    = 0
+  let detectTextEnd      = 0
+  let recognizeTextStart = 0
+  let recognizeTextEnd   = 0
 
   fileinput.addEventListener('input', async () => {
     const file = fileinput.files?.[0]
@@ -69,15 +84,17 @@ async function main () {
     if (!file)
       return
 
-    startTime = performance.now()
+    runStart = performance.now()
 
     const src = await openImage(file)
 
     cv.imshow(input, src)
 
+    detectObjectStart = performance.now()
+
     const results = await yolo.predict(src)
 
-    detectTime = performance.now() - startTime
+    detectObjectEnd = performance.now()
 
     const result = results.find((item) => {
       const width  = item.bbox[2] - item.bbox[0]
@@ -127,44 +144,71 @@ async function main () {
       cv.rectangle(src, new cv.Point(rect.x, rect.y), new cv.Point(rect.x + rect.width, rect.y + rect.height), colors[result.classId], 2)
       cv.putText(src, result.label, new cv.Point(rect.x + 10, rect.y + 20), cv.FONT_HERSHEY_SIMPLEX, 0.7, new cv.Scalar(255, 255, 255, 255), 1, cv.LINE_AA, false)
 
-      const boxes = await dbnet.predict(gray)
-      const text  = new cv.Mat(gray.rows, gray.cols, dst.type(), new cv.Scalar(255, 255, 255, 255))
+      detectTextStart = performance.now()
 
-      for (const box of boxes) {
-        const rect = new cv.Rect(
-          box[0],
-          box[1],
-          box[2] - box[0],
-          box[3] - box[1],
-        )
+      const textBoxes = await dbnet.predict(gray)
+      const textMat   = new cv.Mat(gray.rows, gray.cols, dst.type(), new cv.Scalar(255, 255, 255, 255))
 
-        const srcRoi = gray.roi(rect)
-        const dstRoi = text.roi(rect)
+      detectTextEnd = performance.now()
 
-        srcRoi.copyTo(dstRoi)
+      const batches = chunk(textBoxes, 32)
 
-        srcRoi.delete()
-        dstRoi.delete()
+      recognizeTextStart = performance.now()
+
+      for (const batch of batches) {
+        const inputs = batch.map((box) => {
+          const rect = new cv.Rect(
+            box.bbox[0],
+            box.bbox[1],
+            box.bbox[2] - box.bbox[0],
+            box.bbox[3] - box.bbox[1],
+          )
+
+          return gray.roi(rect)
+        })
+
+        const texts = await crnn.predictBatch(inputs)
+
+        for (const [i, box] of batch.entries()) {
+          const text = texts[i]
+          const roi  = inputs[i]
+
+          const pt1 = new cv.Point(box.bbox[0], box.bbox[1])
+          const pt2 = new cv.Point(box.bbox[2], box.bbox[3])
+          const pt3 = new cv.Point(pt1.x + 10, pt1.y + Math.floor((pt2.y - pt1.y) / 2) + 8)
+
+          cv.putText(textMat, text, pt3, cv.FONT_HERSHEY_SIMPLEX, 0.7, new cv.Scalar(0, 0, 0, 255), 1, cv.LINE_AA, false)
+          cv.rectangle(textMat, pt1, pt2, new cv.Scalar(0, 0, 0, 255), 1)
+          roi.delete()
+        }
       }
+
+      recognizeTextEnd = performance.now()
 
       cv.imshow(input, src)
       cv.imshow(output, dst)
       cv.imshow(filter, contrast)
       cv.imshow(grayed, gray)
-      cv.imshow(textArea, text)
+      cv.imshow(textArea, textMat)
 
       roi.delete()
       chn.delete()
       mask.delete()
       temp.delete()
+      textMat.delete()
 
-      const totalTime = performance.now() - startTime
-
-      log(`Success, Time: ${toSeconds(totalTime)} (Detect: ${toSeconds(detectTime)})`)
+      runEnd = performance.now()
 
       contrast.delete()
       gray.delete()
       dst.delete()
+
+      log(`Success!
+        Time: ${toSeconds(runStart, runEnd)} (
+        Detect Object: ${toSeconds(detectObjectStart, detectObjectEnd)},
+        Detect Text: ${toSeconds(detectTextStart, detectTextEnd)},
+        Recognize Text: ${toSeconds(recognizeTextStart, recognizeTextEnd)}
+      )`)
     } else {
       const blank = cv.Mat.zeros(404, 640, cv.CV_8UC4)
 

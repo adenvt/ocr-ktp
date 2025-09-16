@@ -60,7 +60,7 @@ export function useYolo ({ model, labels }: YoloOption) {
     const cv        = await useCV()
     const orig      = await openImage(input)
     const size      = orig.size()
-    const inputSize = new cv.Size(inputMeta.shape[2] as number, inputMeta.shape[3] as number)
+    const inputSize = new cv.Size(inputMeta.shape[3] as number, inputMeta.shape[2] as number)
     const resizer   = useResizer(size, inputSize)
 
     const src = new cv.Mat()
@@ -94,7 +94,7 @@ export function useYolo ({ model, labels }: YoloOption) {
     const maskData = maskResult.data as Float32Array
 
     const maskNum  = maskMeta.shape[1] as number
-    const maskSize = new cv.Size(maskMeta.shape[2] as number, maskMeta.shape[3] as number)
+    const maskSize = new cv.Size(maskMeta.shape[3] as number, maskMeta.shape[2] as number)
     const maskDims = maskSize.width * maskSize.height
 
     const results: YoloResult[] = []

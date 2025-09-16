@@ -11,13 +11,13 @@ interface DBNetOption {
 
 interface DBNetPredictOption {
   /**
-   * Confidence threshold
+   * Minimum box confidence
    * @default 0.3
    */
   confidence: number,
   /**
    * Unclip ratio
-   * @default 2
+   * @default 1.75
    */
   unclipRatio: number,
   /**
@@ -27,16 +27,18 @@ interface DBNetPredictOption {
   boxMinArea: number,
 }
 
-type DBNetResult = Array<[number, number, number, number]>
+interface DBNetResult {
+  bbox: [number, number, number, number],
+}
 
 export function useDBNet ({ model }: DBNetOption) {
   const inputMeta  = model.inputMetadata[0] as InferenceSession.TensorValueMetadata // ['batch_size', 3, 1024, 1024]
   const outputMeta = model.outputMetadata[0] as InferenceSession.TensorValueMetadata // ['batch_size', 1, 1024, 1024]
 
-  async function predict (input: string | File | CV.Mat, options?: Partial<DBNetPredictOption>): Promise<DBNetResult> {
+  async function predict (input: string | File | CV.Mat, options?: Partial<DBNetPredictOption>): Promise<DBNetResult[]> {
     const config = defu<DBNetPredictOption, [DBNetPredictOption]>(options, {
       confidence : 0.3,
-      unclipRatio: 2,
+      unclipRatio: 1.75,
       boxMinArea : 64,
     })
 
@@ -44,7 +46,7 @@ export function useDBNet ({ model }: DBNetOption) {
     const cv        = await useCV()
     const orig      = await openImage(input)
     const size      = orig.size()
-    const inputSize = new cv.Size(inputMeta.shape[2] as number, inputMeta.shape[3] as number)
+    const inputSize = new cv.Size(inputMeta.shape[3] as number, inputMeta.shape[2] as number)
     const resizer   = useResizer(size, inputSize)
 
     const src = new cv.Mat()
@@ -63,6 +65,7 @@ export function useDBNet ({ model }: DBNetOption) {
       false, // crop
     )
 
+    // Inference
     const tensor = new Tensor('float32', blob.data32F, [1, ...inputMeta.shape.slice(1)] as number[])
     const result = await model.run({ [inputMeta.name]: tensor })
 
@@ -71,8 +74,8 @@ export function useDBNet ({ model }: DBNetOption) {
 
     // Postprocess
     const mask = cv.matFromArray(
-      outputMeta.shape[2] as number,
       outputMeta.shape[3] as number,
+      outputMeta.shape[2] as number,
       cv.CV_8UC1,
       Uint8ClampedArray.from(maskData, (c) => sigmoid(c) >= config.confidence ? 255 : 0),
     )
@@ -82,12 +85,16 @@ export function useDBNet ({ model }: DBNetOption) {
 
     cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
-    const boxes: Array<[number, number, number, number]> = []
+    const boxes: DBNetResult[] = []
 
     for (let i = 0; i < contours.size(); i++) {
       const contour = contours.get(i)
-      const area    = cv.contourArea(contour)
-      const length  = cv.arcLength(contour, true)
+      const hull    = new cv.Mat()
+
+      cv.convexHull(contour, hull, true, true)
+
+      const area   = cv.contourArea(hull)
+      const length = cv.arcLength(hull, true)
 
       if (area > config.boxMinArea && length > 0) {
         const d    = Math.ceil(area * config.unclipRatio / length)
@@ -99,14 +106,17 @@ export function useDBNet ({ model }: DBNetOption) {
           box.height + d * 2,
         ))
 
-        boxes.push([
-          rect.x,
-          rect.y,
-          rect.x + rect.width,
-          rect.y + rect.height,
-        ])
+        boxes.push({
+          bbox: [
+            rect.x,
+            rect.y,
+            rect.x + rect.width,
+            rect.y + rect.height,
+          ],
+        })
       }
 
+      hull.delete()
       contour.delete()
     }
 
@@ -118,6 +128,8 @@ export function useDBNet ({ model }: DBNetOption) {
     src.delete()
     raw.delete()
     orig.delete()
+
+    boxes.sort((a, b) => b.bbox[0] - a.bbox[0])
 
     return boxes
   }

@@ -19,12 +19,13 @@ export function clamp (value: number, min: number, max: number): number {
 }
 
 export function argmax (arr: number[]) {
-  let maxIdx = 0
+  return arr.indexOf(Math.max(...arr))
+}
 
-  for (let i = 1; i < arr.length; i++) {
-    if (arr[i] > arr[maxIdx])
-      maxIdx = i
-  }
+export function softmax (arr: number[]): number[] {
+  const max  = Math.max(...arr)
+  const exps = arr.map((x) => Math.exp(x - max))
+  const sum  = exps.reduce((a, b) => a + b, 0)
 
-  return maxIdx
+  return exps.map((x) => x / sum)
 }

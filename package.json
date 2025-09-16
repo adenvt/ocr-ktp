@@ -32,6 +32,7 @@
   "dependencies": {
     "@techstark/opencv-js": "^4.11.0-release.1",
     "defu": "^6.1.4",
+    "es-toolkit": "^1.39.10",
     "onnxruntime-web": "1.22.0"
   },
   "license": "AGPL-3.0-only"
