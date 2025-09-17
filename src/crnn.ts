@@ -21,7 +21,7 @@ export function useCRNN ({ model, vocab = DEFAULT_VOCAB }: CRNNOption) {
       const orig      = await openImage(input)
       const size      = orig.size()
       const inputSize = new cv.Size(inputMeta.shape[3] as number, inputMeta.shape[2] as number)
-      const resizer   = useResizer(size, inputSize, ResizeAlign.TOP_LEFT)
+      const resizer   = useResizer(size, inputSize, ResizeAlign.MID_LEFT)
 
       const src = new cv.Mat()
       const raw = new cv.Mat()

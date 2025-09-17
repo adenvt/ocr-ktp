@@ -24,13 +24,14 @@ function log (message: string) {
 }
 
 async function main () {
-  const fileinput = document.querySelector('#fileinput') as HTMLInputElement
-  const input     = document.querySelector('#input') as HTMLCanvasElement
-  const crop      = document.querySelector('#crop') as HTMLCanvasElement
-  const output    = document.querySelector('#output') as HTMLCanvasElement
-  const filter    = document.querySelector('#filter') as HTMLCanvasElement
-  const grayed    = document.querySelector('#grayed') as HTMLCanvasElement
-  const textArea  = document.querySelector('#text-mask') as HTMLCanvasElement
+  const fileinput  = document.querySelector('#fileinput') as HTMLInputElement
+  const input      = document.querySelector('#input') as HTMLCanvasElement
+  const crop       = document.querySelector('#crop') as HTMLCanvasElement
+  const output     = document.querySelector('#output') as HTMLCanvasElement
+  const filter     = document.querySelector('#filter') as HTMLCanvasElement
+  const grayed     = document.querySelector('#grayed') as HTMLCanvasElement
+  const textArea   = document.querySelector('#text-mask') as HTMLCanvasElement
+  const textResult = document.querySelector('#recognized') as HTMLCanvasElement
 
   log('Initiating OpenCV ...')
 
@@ -148,6 +149,7 @@ async function main () {
 
       const textBoxes = await dbnet.predict(gray)
       const textMat   = new cv.Mat(gray.rows, gray.cols, dst.type(), new cv.Scalar(255, 255, 255, 255))
+      const textRecog = new cv.Mat(gray.rows, gray.cols, dst.type(), new cv.Scalar(255, 255, 255, 255))
 
       detectTextEnd = performance.now()
 
@@ -164,7 +166,13 @@ async function main () {
             box.bbox[3] - box.bbox[1],
           )
 
-          return gray.roi(rect)
+          const srcRoi = gray.roi(rect)
+          const dstRoi = textMat.roi(rect)
+
+          srcRoi.copyTo(dstRoi)
+          dstRoi.delete()
+
+          return srcRoi
         })
 
         const texts = await crnn.predictBatch(inputs)
@@ -177,8 +185,8 @@ async function main () {
           const pt2 = new cv.Point(box.bbox[2], box.bbox[3])
           const pt3 = new cv.Point(pt1.x + 10, pt1.y + Math.floor((pt2.y - pt1.y) / 2) + 8)
 
-          cv.putText(textMat, text, pt3, cv.FONT_HERSHEY_SIMPLEX, 0.7, new cv.Scalar(0, 0, 0, 255), 1, cv.LINE_AA, false)
-          cv.rectangle(textMat, pt1, pt2, new cv.Scalar(0, 0, 0, 255), 1)
+          cv.putText(textRecog, text, pt3, cv.FONT_HERSHEY_SIMPLEX, 0.7, new cv.Scalar(0, 0, 0, 255), 2, cv.LINE_AA, false)
+
           roi.delete()
         }
       }
@@ -190,12 +198,14 @@ async function main () {
       cv.imshow(filter, contrast)
       cv.imshow(grayed, gray)
       cv.imshow(textArea, textMat)
+      cv.imshow(textResult, textRecog)
 
       roi.delete()
       chn.delete()
       mask.delete()
       temp.delete()
       textMat.delete()
+      textRecog.delete()
 
       runEnd = performance.now()
 
@@ -204,11 +214,11 @@ async function main () {
       dst.delete()
 
       log(`Success!
-        Time: ${toSeconds(runStart, runEnd)} (
         Detect Object: ${toSeconds(detectObjectStart, detectObjectEnd)},
         Detect Text: ${toSeconds(detectTextStart, detectTextEnd)},
-        Recognize Text: ${toSeconds(recognizeTextStart, recognizeTextEnd)}
-      )`)
+        Recognize Text: ${toSeconds(recognizeTextStart, recognizeTextEnd)},
+        Total: ${toSeconds(runStart, runEnd)}
+      `)
     } else {
       const blank = cv.Mat.zeros(404, 640, cv.CV_8UC4)
 
